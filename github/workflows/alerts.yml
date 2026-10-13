@@ -1,0 +1,53 @@
+name: nba-alerts
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: nba-alerts
+  cancel-in-progress: false
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install pandas numpy requests pyarrow
+      - id: day
+        run: echo "d=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+      - name: Game logs (cached per day)
+        id: logs
+        uses: actions/cache@v4
+        with:
+          path: nba_gamelogs.csv
+          key: logs-${{ steps.day.outputs.d }}
+      - if: steps.logs.outputs.cache-hit != 'true'
+        run: python build_data.py
+      - name: Restore last injury snapshot
+        uses: actions/cache/restore@v4
+        with:
+          path: injury_snapshot.json
+          key: snap-none
+          restore-keys: snap-
+      - name: Find chat id (only if secret is empty)
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$CHAT" ]; then python nba_alerts.py --find-chat-id; fi
+      - name: Poll once
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python nba_alerts.py --once
+      - name: Save snapshot
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: injury_snapshot.json
+          key: snap-${{ github.run_id }}
+          
