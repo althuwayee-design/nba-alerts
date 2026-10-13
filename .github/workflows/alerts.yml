@@ -50,7 +50,7 @@ jobs:
         with:
           path: injury_snapshot.json
           key: snap-${{ github.run_id }}
-                - name: Test message (manual runs only)
+      - name: Test message (manual runs only)
         if: github.event_name == 'workflow_dispatch'
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
