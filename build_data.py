@@ -39,6 +39,11 @@ def main():
     print("playerlog columns:", list(pl.columns))
     print("gamelog columns:", list(gl.columns))
 
+    if pick(pl, "PLAYER_NAME", "playerName", "name") is None:
+        fn, ln = pick(pl, "firstName"), pick(pl, "familyName")
+        if fn and ln:
+            pl["PLAYER_NAME"] = pl[fn].astype(str).str.strip() + " " + pl[ln].astype(str).str.strip()
+
     c = dict(gid=pick(pl, "GAME_ID", "gameId"), pid=pick(pl, "PLAYER_ID", "personId", "playerId"),
              name=pick(pl, "PLAYER_NAME", "playerName", "name"),
              team=pick(pl, "TEAM_ABBREVIATION", "teamTricode", "team"),
@@ -75,3 +80,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
