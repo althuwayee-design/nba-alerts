@@ -15,7 +15,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-    
       - run: pip install pandas numpy requests pyarrow
       - id: day
         run: echo "d=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
@@ -27,28 +26,32 @@ jobs:
           key: logs-${{ steps.day.outputs.d }}
       - if: steps.logs.outputs.cache-hit != 'true'
         run: python build_data.py
-      - name: Restore last injury snapshot
+      - name: Restore state
         uses: actions/cache/restore@v4
         with:
-          path: injury_snapshot.json
+          path: |
+            injury_snapshot.json
+            feeds_snapshot.json
           key: snap-none
           restore-keys: snap-
-      - name: Find chat id (only if secret is empty)
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          if [ -z "$CHAT" ]; then python nba_alerts.py --find-chat-id; fi
-      - name: Poll once
+      - name: Injuries
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python nba_alerts.py --once
-      - name: Save snapshot
+      - name: Trades, news, lineups
+        continue-on-error: true
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python feeds_alerts.py
+      - name: Save state
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: injury_snapshot.json
+          path: |
+            injury_snapshot.json
+            feeds_snapshot.json
           key: snap-${{ github.run_id }}
       - name: Test message (manual runs only)
         if: github.event_name == 'workflow_dispatch'
@@ -58,4 +61,4 @@ jobs:
         run: |
           curl -sS -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" \
-            -d text="✅ التنبيهات تعمل. أي تغيير في تقرير الإصابات سيصلك هنا."
+            -d text="✅ التنبيهات تعمل (إصابات + حركات لاعبين + أخبار + تشكيلات)."
